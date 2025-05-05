@@ -1,139 +1,65 @@
-# Valorant (any game really) trigger bot
-# Made with ♥ by b0kch01
-
 import colorama
 from termcolor import cprint, colored
 from pyfiglet import Figlet
-from pynput.mouse import Controller, Button
-from pynput import mouse
 import numpy as np
 import d3dshot
 import time
 import keyboard
-import win32gui
 import win32api
 import os
 import ctypes
 
-# Disable quick-edit mode (pauses bot)
+# 初期設定
+colorama.init()
 kernel32 = ctypes.windll.kernel32
 kernel32.SetConsoleMode(kernel32.GetStdHandle(-10), 128)
 
-# Fix legacy console color
-colorama.init()
-
-# CONSTANTS
-KEYBIND = "alt"  # Default keybind
-BOX_LENGTH = 4  # Screen capture size
-SCREEN_X = win32api.GetSystemMetrics(0)  # Auto-fetched (doesn't always work)
+# 定数
+KEYBIND = "alt"
+BOX_LENGTH = 4
+SCREEN_X = win32api.GetSystemMetrics(0)
 SCREEN_Y = win32api.GetSystemMetrics(1)
+REGION = (
+    int(SCREEN_X/2 - BOX_LENGTH/2),
+    int(SCREEN_Y/2 - BOX_LENGTH/2),
+    int(SCREEN_X/2 + BOX_LENGTH/2),
+    int(SCREEN_Y/2 + BOX_LENGTH/2)
+)
 
-# Calculating box coorinates
-X1 = int(SCREEN_X/2 - BOX_LENGTH/2)
-Y1 = int(SCREEN_Y/2 - BOX_LENGTH/2)
-X2 = int(X1 + BOX_LENGTH)
-Y2 = int(Y1 + BOX_LENGTH)
-
-REGION = (X1, Y1, X2, Y2)
-
-cprint("Setting up...")
-cprint(" - [¤] Windows", "green")
-cprint(f" - [¤] {SCREEN_X}x{SCREEN_Y}", "green")
-
+# 管理者権限チェック
 if ctypes.windll.shell32.IsUserAnAdmin() == 0:
-    cprint(" - [x] Please run as administrator", "red")
-    exit(0)
+    cprint("管理者権限で実行してください", "red")
+    exit(1)
 
-cprint(f" - [¤] {SCREEN_X}x{SCREEN_Y}", "green")
-
-time.sleep(0.5)
-
-# Disable click delay (100ms)
-win32gui.GetDoubleClickTime = lambda: 0
-
-# Instantiate mouse controller
-mouse = Controller()
-
-# Instantiate screen capture (numpy is the fastest)
+# 画面キャプチャ初期化
 d = d3dshot.create(capture_output="numpy")
+win32api.GetDoubleClickTime = lambda: 0
 
-
-# Grabs center screen as an average pixel value
 def rgb_pixel():
-    return np.average(d.screenshot(region=REGION))
+    img = d.screenshot(region=REGION)
+    return np.mean(img, axis=(0,1)) if img is not None else None
 
+def click():
+    win32api.mouse_event(0x0002, 0, 0, 0, 0)
+    time.sleep(0.01)
+    win32api.mouse_event(0x0004, 0, 0, 0, 0)
 
-# Given start time, returns time elapsed in ms
-def time_elapsed(start_time):
-    return str(int((time.time() - start_time)*1000)) + "ms"
+def color_match(current, target, threshold=5):
+    return all(abs(c - t) < threshold for c, t in zip(current, target))
 
-
-# User Interface
-f = Figlet(font="ogre")
-
-CACHED_TITLESCREEN = f"""
-{ f.renderText("Valorant Cheat")[:-3] }
-{ colored(" Created with ♥ by b0kch01! ", "grey", "on_white") }
-{ colored(" USE AT YOUR OWN RISK       ", "grey", "on_yellow") }
-
-Enjoy! :)
-"""
-
-
-# Clears console
-def clear():
-    os.system("cls")
-
-
-# Prints titlescreen
-def titlescreen():
-    clear()
-    print(CACHED_TITLESCREEN)
-
-
-# MAIN SCRIPT
+# メインループ
 try:
-    titlescreen()
-    if input("Set custom keybind? (yes/no): ")[:1] in "yY":
-        titlescreen()
-        print(f"Current keybind: [{colored(KEYBIND, 'green')}]")
-        print("\nPress [ESC] to continue")
-
-        new_key = KEYBIND
-
-        while True:
-            new_key = keyboard.read_key()
-
-            if new_key == "esc":
-                break
-            elif new_key != KEYBIND:
-                KEYBIND = new_key
-                titlescreen()
-                print(f"Current keybind: [{colored(KEYBIND, 'green')}]")
-                print("\nPress [ESC] to continue")
-
-    titlescreen()
-    print(f"Current keybind: [{colored(KEYBIND, 'green')}]")
-    cprint("\nReady to frag.", "green")
-
-    current_pixel = rgb_pixel()
+    target_colors = [[145,94,67],[109,72,52]]
+    print("準備完了...")
 
     while True:
-        if keyboard.is_pressed(KEYBIND):
-            timeS = time.time()
-            new_pixel = rgb_pixel()
-
-            if abs(current_pixel - new_pixel) > 5:
-                mouse.click(Button.left)
-                print("[¤] Clicked within " + time_elapsed(timeS))
-
-            current_pixel = new_pixel
-        else:
-            current_pixel = rgb_pixel()
-            time.sleep(0.05)
+        pixel = rgb_pixel()
+        if pixel is not None and any(color_match(pixel, target) for target in target_colors):
+            click()
+            print(pixel)
+            time.sleep(0.01)
 
 except KeyboardInterrupt:
     pass
 
-cprint("\n~ Program exited ;-;", "grey", "on_red")
-time.sleep(1)
+print("終了しました")
