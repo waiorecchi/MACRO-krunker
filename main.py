@@ -1,6 +1,5 @@
 import colorama
 from termcolor import cprint, colored
-from pyfiglet import Figlet
 import numpy as np
 import d3dshot
 import time
